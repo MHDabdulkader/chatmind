@@ -45,7 +45,7 @@ def chat(body: ChatIn):
       for mode, payload in agent.stream(
         {"messages": [{"role": "user", "content": body.message}]},
         config,
-        context=ChatContext(project_id=body.project_id),
+        context=ChatContext(project_id=body.project_id, allow_web=body.allow_web),
         stream_mode=["messages", "updates"]
       ):
         if mode == "messages" :

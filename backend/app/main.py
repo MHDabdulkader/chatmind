@@ -5,20 +5,31 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api import chat, documents
-from app.db import Base, engine
+from app.api import chat, documents, projects
+from app.db import Base, engine, SessionLocal
 from app import models
+from app.models import Project
+
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
   os.makedirs("data", exist_ok=True)
   os.makedirs(settings.upload_dir, exist_ok=True)
   Base.metadata.create_all(engine)
+  print("[DB] Tables: ", list(Base.metadata.tables))
+  db = SessionLocal()
+
+  if not db.get(Project, "default"):
+    db.add(Project(id="default", name="Default", description="Default description"))
+    db.commit()
+  db.close()  
+
   yield
 
 
 
-app = FastAPI(title="ChatMind API")
+app = FastAPI(title="ChatMind API", lifespan=lifespan)
 
 app.add_middleware(
   CORSMiddleware, 
@@ -29,6 +40,7 @@ app.add_middleware(
 
 app.include_router(chat.router)
 app.include_router(documents.router)
+app.include_router(projects.router)
 
 @app.get("/health")
 def health():

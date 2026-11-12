@@ -7,9 +7,16 @@ from app.core.context import ChatContext
 
 from app.core import rag
 
+def _web_off(runtime=ToolRuntime[ChatContext]) -> bool:
+  return bool(runtime.context) and not runtime.context.allow_web
+
+
+
 @tool
 def search_docs(query:str, runtime: ToolRuntime[ChatContext]) -> str:
   """Search the user's uploaded documents. Use this first for questions about their files"""
+
+
   project_id = runtime.context.project_id if runtime.context else None
 
   results = rag.search(query, k=4, project_id=project_id)
@@ -24,8 +31,11 @@ def search_docs(query:str, runtime: ToolRuntime[ChatContext]) -> str:
 
 
 @tool
-def web_search(query: str) -> str:
+def web_search(query: str, runtime=ToolRuntime[ChatContext]) -> str:
   """Search the web for current or public information not found in the documents."""
+  if _web_off(runtime):
+    return "Web access is disabled for this chat. Answer from the documents only."
+
   print(f"[TOOL] web_search({query!r})")
   try:
     hits= DDGS().text(query, max_results=5)
@@ -38,6 +48,9 @@ def web_search(query: str) -> str:
 @tool
 def read_webpage(url: str) -> str:
   """Open a web page URL(e.g. from web_search results) and return its text."""
+  if _web_off(runtime):
+    return "Web access is disabled for this chat."
+  
   print(f"[TOOL] read_webpage({url})")
   try:
     r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)

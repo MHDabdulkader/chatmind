@@ -6,6 +6,7 @@ class ChatIn(BaseModel):
   thread_id: str | None = None
   model: str | None = None
   project_id: str | None = None
+  allow_web: bool = True
 
 
 class UrlIn(BaseModel):

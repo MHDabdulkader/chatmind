@@ -29,11 +29,11 @@ class Document(Base):
   
 
 class Project(Base):
-  __table__ = "projects"
+  __tablename__ = "projects"
 
   id: Mapped[str] = mapped_column(String, primary_key=True, default=_id)
   name : Mapped[str] = mapped_column(String)
   description: Mapped[str] = mapped_column(Text, default="")
-  created_at = Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+  created_at : Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
