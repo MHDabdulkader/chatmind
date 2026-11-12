@@ -1,0 +1,28 @@
+# API
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic-settings
+sqlalchemy
+
+# LangChain / LangGraph
+langchain
+langgraph
+langgraph-checkpoint-sqlite
+langchain-openrouter
+langchain-huggingface
+langchain-chroma
+langchain-text-splitters
+sentence-transformers
+
+# Ingest + tools
+pypdf
+ddgs
+beautifulsoup4
+requests
+reportlab
+
+# Misc
+python-dotenv
+pytest
+httpx
