@@ -30,8 +30,8 @@ chatmind/
 | Documents (upload, URL, status, delete) | Done        |
 | Projects, stats, synthesis              | Done        |
 | Web search + page reading               | Done        |
-| Prompt Library                          | In progress |
-| Conversation history (threads)          | Planned     |
+| Prompt Library                          | Done        |
+| Conversation history (threads)          | In progress |
 | Model selector endpoint                 | Planned     |
 | PDF export                              | Planned     |
 | Frontend                                | Planned     |

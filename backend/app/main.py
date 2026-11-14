@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api import chat, documents, projects
+from app.api import chat, documents, projects, prompts
 from app.db import Base, engine, SessionLocal
 from app import models
 from app.models import Project
@@ -23,6 +23,8 @@ async def lifespan(app: FastAPI):
   if not db.get(Project, "default"):
     db.add(Project(id="default", name="Default", description="Default description"))
     db.commit()
+
+  prompts.seed_prompts()
   db.close()  
 
   yield
@@ -41,6 +43,8 @@ app.add_middleware(
 app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(projects.router)
+app.include_router(prompts.router)
+
 
 @app.get("/health")
 def health():

@@ -40,4 +40,39 @@ class ProjectOut(BaseModel):
   created_at: datetime
 
 
+class PromptIn(BaseModel):
+  name: str
+  description: str = ""
+  template: str
+  category: str = "General"
+  tags: list[str] = []
+
+class PromptPatch(BaseModel):
+  name: str | None = None
+  description: str | None = None
+  template: str | None = None
+  category : str | None = None
+  tags : list[str] | None = None
+  pinned : bool | None = None
+
+class PromptOut(BaseModel):
+  model_config = ConfigDict(from_attributes=True)
+
+  id: str
+  name: str
+  description: str
+  template: str
+  category: str
+  tags: list[str]
+  pinned : bool
+  run_count: int
+  est_tokens: int
+  created_at: datetime
+
+class RunIn(BaseModel):
+  input: str
+  model: str | None = None
+
+
+
 
