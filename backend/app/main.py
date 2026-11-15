@@ -3,12 +3,15 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.api import chat, documents, projects, prompts
+from app.api import chat, documents, projects, prompts,threads
+from app.api import models as model_routes
 from app.db import Base, engine, SessionLocal
 from app import models
 from app.models import Project
+
 
 
 
@@ -44,7 +47,11 @@ app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(projects.router)
 app.include_router(prompts.router)
+app.include_router(threads.router)
+app.include_router(model_routes.router)
 
+os.makedirs(settings.upload_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
 
 @app.get("/health")
 def health():

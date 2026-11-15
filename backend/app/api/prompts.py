@@ -11,22 +11,33 @@ router = APIRouter(prefix="/prompts", tags=["prompts"])
 
 SEEDS = [
     ("Smart Summarizer", "Condense long documents and notes into crisp bulleted briefs.",
-     "Summarize the following into concise bullet points:\n\n{input}", "Synthesis", True),
+     "Summarize the following into concise bullet points:\n\n{input}", "Synthesis", ["#Synthesis", "#Notes"], True),
     ("Code Assistant", "Write, refactor, and explain clean functions across languages.",
-     "You are a senior engineer. Help with this code task:\n\n{input}", "Engineering", True),
+     "You are a senior engineer. Help with this code task:\n\n{input}", "Engineering", ["#Engineering", "#CleanCode"], True),
     ("Study Partner", "Master complex topics through interactive Q&A and quizzes.",
-     "Teach me this topic step by step, then quiz me with 3 questions:\n\n{input}", "Learning", True),
+     "Teach me this topic step by step, then quiz me with 3 questions:\n\n{input}", "Learning", ["#Learning", "#Study"], True),
     ("Idea Spark", "Unblock creative barriers and generate novel outlines and ideas.",
-     "Give me 8 fresh, distinct ideas for:\n\n{input}", "Ideation", True),
+     "Give me 8 fresh, distinct ideas for:\n\n{input}", "Ideation", ["#Ideation", "#Creative"], True),
+    ("Literature Reviewer", "Deconstructs peer-reviewed studies into clear thesis claims, methodology notes, and synthesis tables.",
+     "Deconstruct this research into thesis claims, methodology notes, and synthesis table:\n\n{input}", "Writing & Research", ["#Research", "#Academic"], False),
+    ("Socratic Writing Coach", "Challenges core arguments with probing questions to eliminate passive prose and clarify narrative arc.",
+     "Challenge the arguments in this draft with Socratic questions to sharpen the narrative:\n\n{input}", "Writing & Research", ["#Writing", "#Philosophy"], False),
+    ("Clean Architecture Refactor", "Restructures messy logic into decoupled, highly testable domain patterns and clean interfaces.",
+     "Refactor this code into clean, decoupled domain patterns and testable interfaces:\n\n{input}", "Coding", ["#Engineering", "#Refactor"], False),
+    ("Financial Analyst", "Breaks down balance sheets, revenue streams, and unit economics with insightful variance projections.",
+     "Analyze these financial figures, unit economics, and project variances:\n\n{input}", "Data", ["#Finance", "#Ledgers"], False),
+    ("Counterfactual Opponent", "Constructs rigorous counter-arguments and identifies edge cases to test your assertions before sharing.",
+     "Construct rigorous counter-arguments and find hidden edge cases in this proposal:\n\n{input}", "Editorial", ["#Debate", "#Logic"], False),
+    ("Monograph Editor", "Polishes tone, rhythm, and diction for publication-ready essays and editorial pieces.",
+     "Edit this text for tone, rhythm, and publication-ready diction:\n\n{input}", "Editorial", ["#Publishing", "#Style"], False),
 ]
 
 def seed_prompts() -> None:
   db = SessionLocal()
-  if db.query(Prompt).count() == 0 :
-    for name, desc, tpl, cat, pinned in SEEDS:
-      db.add(Prompt(name=name, description=desc, template=tpl, category=cat, pinned=pinned))
-    db.commit()
-    print(f"[SEED] {len(SEEDS)} prompts")
+  for name, desc, tpl, cat, tags, pinned in SEEDS:
+    if not db.query(Prompt).filter(Prompt.name == name).first():
+      db.add(Prompt(name=name, description=desc, template=tpl, category=cat, tags=tags, pinned=pinned))
+  db.commit()
   db.close()
 
 @router.get("", response_model=list[PromptOut])

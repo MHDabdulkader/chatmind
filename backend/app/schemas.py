@@ -75,4 +75,19 @@ class RunIn(BaseModel):
 
 
 
+class ThreadOut(BaseModel):
+  model_config = ConfigDict(from_attributes=True)
+
+  id: str
+  title: str
+  project_id: str | None
+  created_at: datetime
+  updated_at : datetime
+
+class ThreadPatch(BaseModel):
+  title: str
+
+class ExportIn(BaseModel):
+  findings: list[dict] | None = None
+
 

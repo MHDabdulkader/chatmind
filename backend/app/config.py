@@ -13,7 +13,7 @@ class Settings(BaseSettings):
   database_url : str = "sqlite:///./data/app.db"
   chroma_dir: str = "./data/chroma_db"
   upload_dir: str = "./data/uploads"
-  cors_origins: str = "http://localhost:3000"
+  cors_origins: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
 
   @property
   def origins(self) -> list[str]:

@@ -9,6 +9,12 @@ from app.core.context import ChatContext
 
 from datetime import date
 from langchain.agents.middleware import dynamic_prompt, ModelRequest
+import os 
+import sqlite3
+
+from langgraph.checkpoint.sqlite import SqliteSaver
+
+
 
 SYSTEM_PROMPT = (
     "You are a research assistant. "
@@ -25,8 +31,11 @@ SYSTEM_PROMPT = (
     "Quote the exact row you used. "
 )
 
-
-checkpointer = InMemorySaver()
+os.makedirs("data", exist_ok=True)
+_conn = sqlite3.connect("data/checkpoints.db", check_same_thread=False)
+_conn.execute("PRAGMA journal_mode=WAL")
+checkpointer = SqliteSaver(_conn)
+print("[MEMORY] SQLite checkpointer at data/checkpoints.db")
 
 _agents: dict[str, object] = {}
 
@@ -45,7 +54,7 @@ def get_agent(slug: str|None=None):
       system_prompt=SYSTEM_PROMPT,
       context_schema=ChatContext,
       middleware=[
-        ModelRetryMiddleware(max_retries=3),
+        ModelRetryMiddleware(max_retries=1),
         ToolRetryMiddleware(max_retries=2, on_failure="continue"),
         ModelCallLimitMiddleware(run_limit=8, exit_behavior="end"),
         ToolCallLimitMiddleware(run_limit=5)

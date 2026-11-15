@@ -31,7 +31,7 @@ def _content(res) -> str:
   return c or res.additional_kwargs.get("reasoning_content", "") or ""
 
 def _parse(res: str) -> dict:
-  raw = re.sub(r"```(?:json)?", "", raw)
+  raw = re.sub(r"```(?:json)?", "", res)
   m = re.search(r"\{.*\}", raw, re.S)
   return json.loads(m.group(0)) if m else {}
 

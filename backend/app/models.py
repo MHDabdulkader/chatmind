@@ -53,3 +53,14 @@ class Prompt(Base):
   @property
   def est_tokens(self) -> int:
     return max(1, len(self.template or "")//4)
+
+
+class Thread(Base):
+  __tablename__ = "threads"
+
+  id : Mapped[str] = mapped_column(String, primary_key=True)
+  title: Mapped[str] = mapped_column(String, default="New chat")
+  project_id : Mapped[str] = mapped_column(String, nullable=True, index=True)
+  created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+  updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+  

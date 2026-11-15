@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+import re
 from sqlalchemy.orm import Session
 
 from sqlalchemy import func
@@ -6,8 +7,10 @@ from sqlalchemy import func
 from app.core import rag
 from app.core.synthesis import synthesize
 from app.db import get_db
-from app.schemas import ProjectIn,  ProjectOut
+from app.schemas import ProjectIn,  ProjectOut, ExportIn
 from app.models import Project, Document
+from app.services.export_pdf import build_pdf
+
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
@@ -58,10 +61,10 @@ def get_stats(pid: str, db: Session=Depends(get_db)):
   }
 
 @router.post("/{pid}/synthesis")
-def synthesis(pid: str, model: str |None=None, db: Session = Depends(get_db)):
+def run_synthesis(pid: str, model: str | None = None, db: Session = Depends(get_db)):
   if not db.get(Project, pid):
     raise HTTPException(404, "Not found")
-  return synthesize
+  return synthesize(pid, slug=model)
 
 
 
@@ -81,5 +84,23 @@ def delete_project(pid: str, db: Session=Depends(get_db)):
 
   return {"delete": pid}
 
+
+@router.post("/{pid}/export")
+def export_pdf(pid: str, body: ExportIn|None = None, db: Session=Depends(get_db)):
+  p = db.get(Project, pid)
+
+  if not p:
+    raise HTTPException(404, "Not found")
+  docs = db.query(Document).filter(Document.project_id == pid).all()
+
+  findings = body.findings if body and body.findings is not None else synthesize(pid)["findings"]
+  pdf = build_pdf(p, docs, findings)
+
+  fname = re.sub(r"[^A-Za-z0-9_-]+", "_", p.name) or "project"
+  return Response(
+    content=pdf, 
+    media_type="application/pdf",
+    headers={"Content-Disposition": f'attachment; filename="{fname}.pdf"'}
+  )
 
 

@@ -11,6 +11,7 @@ from app.core.agent import get_agent
 from app.schemas import ChatIn
 from app.services.events import sse
 from app.core.context import ChatContext
+from app.services.threads import touch_thread
 
 router = APIRouter(tags=["chat"])
 
@@ -40,8 +41,10 @@ def chat(body: ChatIn):
       agent = get_agent(body.model)
       config = {"configurable": {"thread_id": thread_id}}
       yield sse("thread", {"thread_id": thread_id})
+      touch_thread(thread_id, body.message, body.project_id)
       print(f"[CHAT] thread={thread_id[:8]} msg={body.message[:60]!r}")
 
+      limit_notified = False
       for mode, payload in agent.stream(
         {"messages": [{"role": "user", "content": body.message}]},
         config,
@@ -53,6 +56,14 @@ def chat(body: ChatIn):
           if meta.get("langgraph_node") == "model":
             text = _text(chunk.content)
             if text:
+              if not limit_notified and ("free-models-per-day" in text or "Rate limit exceeded" in text or "TooManyRequestsResponseError" in text):
+                limit_notified = True
+                yield sse("limit_exceeded", {
+                  "provider": "OpenRouter",
+                  "reason": "daily_free_limit",
+                  "message": "OpenRouter daily free requests limit reached (free-models-per-day). Resets at 00:00 UTC.",
+                  "alternative": "gemini-3.8-flash"
+                })
               yield sse("token",  text)
         elif mode == "updates":
           for node, data in payload.items():
@@ -63,9 +74,18 @@ def chat(body: ChatIn):
             if not msgs:
               continue
             last = msgs[-1]
-            for tc in getattr(last, "tool_calls", None):
+            last_text = str(getattr(last, "content", ""))
+            if not limit_notified and ("free-models-per-day" in last_text or "Rate limit exceeded" in last_text or "TooManyRequestsResponseError" in last_text):
+              limit_notified = True
+              yield sse("limit_exceeded", {
+                "provider": "OpenRouter",
+                "reason": "daily_free_limit",
+                "message": "OpenRouter daily free requests limit reached (free-models-per-day). Resets at 00:00 UTC.",
+                "alternative": "gemini-3.5-flash"
+              })
+            for tc in (getattr(last, "tool_calls", []) or []):
               steps += 1
-              print(f"[STEP] {tc["name"]} {tc["args"]}")
+              print(f"[STEP] {tc['name']} {tc['args']}")
               yield sse("step", {"tool": tc["name"], "args": tc["args"]})
             um = getattr(last, "usage_metadata", None) 
             if um:
@@ -80,7 +100,38 @@ def chat(body: ChatIn):
 
     except Exception as e:
       traceback.print_exc()
-      yield sse("error", f"{type(e).__name__} : {e}")
+      err_text = str(e)
+      if "RESOURCE_EXHAUSTED" in err_text or "Quota exceeded" in err_text:
+        model_name = body.model or "gemini-3.8-flash"
+        yield sse("limit_exceeded", {
+          "provider": "Google",
+          "reason": "daily_free_limit",
+          "message": f"Daily quota limit exceeded for '{model_name}'. Switch to Gemini 3.5 Flash for high free limits.",
+          "alternative": "gemini-3.5-flash"
+        })
+        msg = f"Quota exceeded for {model_name}. Please switch to Google Gemini 3.5 Flash to continue chatting."
+        yield sse("error", msg)
+      elif "free-models-per-day" in err_text:
+        yield sse("limit_exceeded", {
+          "provider": "OpenRouter",
+          "reason": "daily_free_limit",
+          "message": "OpenRouter daily free requests limit reached (free-models-per-day). Resets at 00:00 UTC.",
+          "alternative": "gemini-3.5-flash"
+        })
+        msg = "Daily Free Quota Exceeded on OpenRouter (free-models-per-day). Your Google Gemini key is active—click the banner below to switch to Gemini 3.5 Flash and continue chatting instantly!"
+        yield sse("error", msg)
+      elif "429" in err_text or "rate-limited" in err_text.lower() or "TooManyRequests" in type(e).__name__:
+        model_name = body.model or settings.default_model
+        yield sse("limit_exceeded", {
+          "provider": "Google" if "gemini" in str(model_name).lower() else "OpenRouter",
+          "reason": "upstream_rate_limited",
+          "message": f"Model '{model_name}' is temporarily rate-limited upstream.",
+          "alternative": "gemini-3.5-flash"
+        })
+        msg = f"The model '{model_name}' is temporarily rate-limited upstream. Switch to Google Gemini 3.5 Flash to continue."
+        yield sse("error", msg)
+      else:
+        yield sse("error", f"{type(e).__name__}: {e}")
 
   return StreamingResponse(gen(), media_type="text/event-stream")
 

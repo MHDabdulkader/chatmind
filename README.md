@@ -1,210 +1,214 @@
-# ChatMind
+# ChatMind 🧠✨
 
-Chat with your documents and the web. Upload files or URLs, group them into projects, and ask questions. The assistant searches your documents first, falls back to web search when allowed, and remembers the conversation.
+> **An Intelligent Conversational AI Assistant & Research Hub**  
+> Chat with your local documents (`.pdf`, `.txt`, `.md`) and the live web. Scoped project workspaces, automated RAG synthesis, interactive tool tracing, prompt library, and exportable PDF executive briefs.
 
-Single repo, two apps:
+---
+
+## 📸 Overview & Design System
+
+ChatMind features a warm, minimalist aesthetic inspired by modern creative studios:
+- **Light Theme**: Soft warm cream (`#FAF7F2`), delicate borders, and terracotta accents (`#E07A5F`).
+- **Dark Theme**: Deep espresso charcoal (`#141210`), warm dark cards (`#201A16`), and amber glow.
+- **Adaptive Responsiveness**: Tailored desktop workspace with sidebar panels, plus a seamless mobile app experience with bottom navigation and drawer menus.
 
 ```
 chatmind/
-├── backend/    FastAPI + LangChain/LangGraph API
-├── frontend/   Web UI (planned)
+├── backend/          # FastAPI + LangChain/LangGraph Agent + RAG
+│   ├── app/          # API routes, Core LLM/RAG logic, Services
+│   ├── data/         # SQLite DB, checkpoints, and Chroma vector store
+│   └── requirements.txt
+├── frontend/         # React (Vite) + Tailwind CSS + Lucide
+│   ├── src/          # Responsive UI views, components, SSE client
+│   └── package.json
 └── README.md
 ```
 
-## Features
+---
 
-- Streaming chat over Server-Sent Events, with tool steps and token usage
-- Conversation memory per `thread_id`
-- RAG over uploaded `.txt`, `.md`, `.pdf` files and web URLs
-- Projects: documents are scoped per project, so search never leaks across projects
-- Web search and page reading, with a per-request on/off switch
-- Project stats and "key findings" synthesis with real citations
-- Prompt Library: pin, search, and run saved prompt templates
-- Free-tier friendly: runs on a free OpenRouter model and local embeddings
+## ✨ Features
 
-## Status
+- ⚡ **Dual AI Engine Support (Google Gemini + OpenRouter)**:
+  - **Google Gemini Direct API**: Lightning-fast streaming with `gemini-3.8-flash` and `gemini-2.5-pro` (1,500 free requests/day).
+  - **OpenRouter Multi-Vendor Pool**: Broad model catalog (`nvidia/nemotron-3.5-super-vl:free`, `cohere/north-mini-code:free`, etc.).
+  - **Smart Rate Limit Detection & 1-Click Failover**: Automatic detection of `free-models-per-day` quota exhaustion with an in-chat alert banner and 1-click switch to Gemini.
+- ⚡ **Real-time SSE Streaming**: Low-latency token streaming with live tool call steps, latency benchmarks, and token counts.
+- 📋 **Claude-Style Pasted Snippet Cards**: Pasting large code (>12 lines) automatically collapses into an interactive pill widget with line/KB indicators and a dedicated preview modal before sending.
+- 🗄 **Universal Knowledge Vault**: Dedicated browser for all uploaded assets categorized by **Large Code**, **Images**, and **PDF Documents**.
+- 🤖 **Interactive Reasoning Traces**: Expandable *"Thought for X.Xs • Y steps"* containers exposing exact search queries and tools executed.
+- 📄 **Universal Document Ingestion**: Upload `.pdf`, `.txt`, `.md` files or index live Web URLs into isolated vector stores.
+- 🔍 **Hybrid Retrieval-Augmented Generation (RAG)**:
+  - Semantic vector search using local HuggingFace embeddings (`BAAI/bge-small-en-v1.5`).
+  - Chroma vector database scoped strictly per project workspace.
+  - Multi-tier web search fallback (Tavily API with DuckDuckGo fallback).
+- 🔬 **Research Hub & AI Synthesis**:
+  - Live metric cards (Sources count, Zero-hallucination Confidence score, Indexed Chunks, Priority).
+  - One-click multi-source synthesis extracting numbered findings with traceable citations.
+  - Professional PDF export generated with ReportLab.
+- 💡 **Curated Prompt Library**:
+  - Pinned favorites (*Smart Summarizer*, *Code Assistant*, *Study Partner*, *Idea Spark*).
+  - Specialized domain assistants (*Literature Reviewer*, *Socratic Writing Coach*, *Clean Architecture Refactor*, *Financial Analyst*, etc.).
+  - Search, filter by category, pin, run straight into chat, or build custom prompts.
+- 🗂 **Conversation Memory**: Persistent multi-session threads backed by SQLite checkpointing (`checkpoints.db`).
+- 🌓 **Instant Theme Switching**: Warm Cream Light Mode & Espresso Dark Mode, persisted to `localStorage`.
 
-| Area                                    | Status      |
-| --------------------------------------- | ----------- |
-| Chat stream, memory, tools              | Done        |
-| Documents (upload, URL, status, delete) | Done        |
-| Projects, stats, synthesis              | Done        |
-| Web search + page reading               | Done        |
-| Prompt Library                          | Done        |
-| Conversation history (threads)          | In progress |
-| Model selector endpoint                 | Planned     |
-| PDF export                              | Planned     |
-| Frontend                                | Planned     |
+---
 
-## Tech stack
+## 📊 Feature Status
 
-| Layer        | Tools                                                                             |
-| ------------ | --------------------------------------------------------------------------------- |
-| API          | FastAPI, Uvicorn, SQLAlchemy, SQLite                                              |
-| Agent        | LangChain `create_agent`, LangGraph checkpointer, middleware (retry, call limits) |
-| Model        | OpenRouter (`nvidia/nemotron-3.5-super-vl:free` by default)                       |
-| Embeddings   | `BAAI/bge-small-en-v1.5` via HuggingFace, runs locally                            |
-| Vector store | Chroma (persistent)                                                               |
-| Web search   | Tavily (optional) with DuckDuckGo fallbacks                                       |
+| Module | Feature | Status |
+| :--- | :--- | :--- |
+| **Model Providers** | Google Gemini Direct API (`gemini-3.8-flash`, `gemini-2.5-pro`) | ✅ Completed |
+| **Model Providers** | OpenRouter Multi-vendor API (`nemotron-3.5`, `north-mini-code`) | ✅ Completed |
+| **Model Providers** | Daily Quota Exceeded SSE event (`limit_exceeded`) & 1-click failover banner | ✅ Completed |
+| **Chat & Agent** | SSE streaming (`POST /chat`) & Tool step tracing | ✅ Completed |
+| **Chat UI** | Claude-style pasted snippet collapsible cards & preview modal | ✅ Completed |
+| **Knowledge Base** | Document uploading & Knowledge Vault (Code, Images, PDFs) | ✅ Completed |
+| **Knowledge Base** | Local vector embeddings (`bge-small-en-v1.5`) & Chroma | ✅ Completed |
+| **Research Hub** | Workspace scoping, AI Key Findings synthesis & PDF export | ✅ Completed |
+| **Prompt Library**| Pinned favorites, category filters & custom prompt creator | ✅ Completed |
+| **History** | Persistent thread management, rename & delete | ✅ Completed |
+| **Frontend UI** | Responsive desktop & mobile views matching design mockups | ✅ Completed |
+| **Frontend UI** | Light (Cream) & Dark (Espresso) theme support | ✅ Completed |
 
-## Getting started
+---
+
+## 🛠 Tech Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | React 19, Vite, Tailwind CSS v4, Lucide Icons, React-Markdown, Remark-GFM |
+| **Backend API** | FastAPI, Uvicorn, SQLAlchemy 2.0, SQLite (WAL mode), Pydantic v2 |
+| **AI Orchestration** | LangChain Core, `langchain-google-genai`, `langchain-openrouter`, LangGraph Checkpointer |
+| **Vector Engine** | ChromaDB, HuggingFace Transformers (`BAAI/bge-small-en-v1.5`) |
+| **Web & Ingestion** | PyPDF, BeautifulSoup4, DuckDuckGo Search (`ddgs`), Requests, ReportLab |
+
+---
+
+## 🚀 Quick Start Guide
 
 ### Prerequisites
+- **Node.js** v18+ and **npm** v9+
+- **Python** 3.11, 3.12, 3.13, or 3.14
+- A **Google AI Studio Key** (`GOOGLE_API_KEY`) and/or **OpenRouter API Key** (`OPENROUTER_API_KEY`)
 
-- Python 3.12 or 3.13 recommended (3.14 works but prints a harmless Pydantic V1 warning)
-- An OpenRouter API key
-- About 2 GB of disk for the PyTorch and embedding model download
+---
 
-### Backend
+### 1. Backend Setup
 
 ```powershell
+# Navigate to backend directory
 cd backend
-python -m venv .venv
+
+# Activate existing virtual environment
 .\.venv\Scripts\Activate.ps1
+
+# Install dependencies
 pip install -r requirements.txt
-copy .env.example .env      # then fill in OPENROUTER_API_KEY
+
+# Configure environment
+copy .env.example .env
+```
+
+Ensure your `backend/.env` contains your API keys:
+```env
+# Google Gemini Direct (1,500 requests/day free tier)
+GOOGLE_API_KEY=your_google_ai_studio_key_here
+
+# OpenRouter (Multi-model free tier)
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# App Defaults
+DEFAULT_MODEL=gemini-3.8-flash
+EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+DATABASE_URL=sqlite:///./data/app.db
+CHROMA_DIR=./data/chroma_db
+UPLOAD_DIR=./data/uploads
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
+```
+DEFAULT_MODEL=nvidia/nemotron-3.5-super-vl:free
+EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+DATABASE_URL=sqlite:///./data/app.db
+CHROMA_DIR=./data/chroma_db
+UPLOAD_DIR=./data/uploads
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
+```
+
+Start the FastAPI backend server:
+```powershell
 uvicorn app.main:app --reload --reload-dir app --port 8000
 ```
+> The API will be available at `http://localhost:8000`. Interactive Swagger documentation is at `http://localhost:8000/docs`.
 
-Check it: `http://localhost:8000/health` returns `{"status": "ok"}`. Interactive docs are at `http://localhost:8000/docs`.
+---
 
-The first start downloads the embedding model, which takes a while. Later starts take about 10 seconds.
+### 2. Frontend Setup
 
-### Frontend
-
-Not built yet. It will live in `frontend/` and talk to the API at `http://localhost:8000`.
-
-## Environment variables (`backend/.env`)
-
-| Variable             | Default                             | Purpose                            |
-| -------------------- | ----------------------------------- | ---------------------------------- |
-| `OPENROUTER_API_KEY` | required                            | Model access                       |
-| `DEFAULT_MODEL`      | `nvidia/nemotron-3.5-super-vl:free` | Model slug                         |
-| `EMBEDDING_MODEL`    | `BAAI/bge-small-en-v1.5`            | Local embedding model              |
-| `DATABASE_URL`       | `sqlite:///./data/app.db`           | App database                       |
-| `CHROMA_DIR`         | `./data/chroma_db`                  | Vector store                       |
-| `UPLOAD_DIR`         | `./data/uploads`                    | Uploaded files                     |
-| `CORS_ORIGINS`       | `http://localhost:3000`             | Comma-separated allowed origins    |
-| `TAVILY_API_KEY`     | empty                               | Optional, more reliable web search |
-
-## Backend layout
-
-```
-backend/app/
-├── main.py            App setup, CORS, startup (tables, default project, seeds)
-├── config.py          Settings from .env
-├── db.py              SQLAlchemy engine and session
-├── models.py          Tables: documents, projects, prompts
-├── schemas.py         Request/response types
-├── api/               HTTP routes only
-│   ├── chat.py        POST /chat (SSE)
-│   ├── documents.py   upload, URL, list, delete
-│   ├── projects.py    CRUD, stats, synthesis
-│   └── prompts.py     library CRUD, pin, run
-├── core/              AI logic
-│   ├── llm.py         Model factory
-│   ├── agent.py       Agent, middleware, memory
-│   ├── tools.py       search_docs, web_search, read_webpage
-│   ├── rag.py         Chunking, embeddings, Chroma
-│   ├── synthesis.py   Key findings with citations
-│   └── context.py     Per-request context (project, web on/off)
-└── services/          Helpers (ingest, events)
-```
-
-`api/` calls `core/` and `services/`. `core/` never imports from `api/`.
-
-## API
-
-### Chat
-
-`POST /chat`
-
-```json
-{
-  "message": "How much is the Pro plan?",
-  "thread_id": "optional, reuse it to keep memory",
-  "project_id": "optional, scopes document search",
-  "model": "optional model slug",
-  "allow_web": true
-}
-```
-
-The response is a Server-Sent Events stream:
-
-| Event    | Data                             | Meaning                      |
-| -------- | -------------------------------- | ---------------------------- |
-| `thread` | `{"thread_id": "..."}`           | Thread for this conversation |
-| `step`   | `{"tool": "...", "args": {...}}` | The agent called a tool      |
-| `token`  | `"text"`                         | A piece of the answer        |
-| `done`   | `{"seconds", "steps", "usage"}`  | Finished                     |
-| `error`  | `"message"`                      | Failed                       |
-
-Browsers can't use `EventSource` for POST. Read the stream with `fetch` and a reader.
-
-### Documents
-
-| Method | Path                     | Purpose                                           |
-| ------ | ------------------------ | ------------------------------------------------- |
-| POST   | `/documents`             | Upload a file (`multipart`: `file`, `project_id`) |
-| POST   | `/documents/url`         | Add a web page `{"url", "project_id"}`            |
-| GET    | `/documents?project_id=` | List with status                                  |
-| GET    | `/documents/{id}`        | One document                                      |
-| DELETE | `/documents/{id}`        | Delete file and its vectors                       |
-
-Status goes `indexing` then `indexed`, or `failed` with a reason in `error`.
-
-### Projects
-
-| Method     | Path                       | Purpose                                    |
-| ---------- | -------------------------- | ------------------------------------------ |
-| POST / GET | `/projects`                | Create / list                              |
-| GET        | `/projects/{id}`           | One project                                |
-| GET        | `/projects/{id}/stats`     | Counts of sources, indexed, failed, chunks |
-| POST       | `/projects/{id}/synthesis` | Key findings with citations                |
-| DELETE     | `/projects/{id}`           | Delete project and its documents           |
-
-### Prompts
-
-| Method               | Path                            | Purpose                                   |
-| -------------------- | ------------------------------- | ----------------------------------------- |
-| GET                  | `/prompts?q=&category=&pinned=` | List and search                           |
-| POST                 | `/prompts`                      | Create                                    |
-| GET / PATCH / DELETE | `/prompts/{id}`                 | Read / edit / delete                      |
-| POST                 | `/prompts/{id}/pin`             | Toggle pin                                |
-| POST                 | `/prompts/{id}/run`             | Fill `{input}` and run `{"input": "..."}` |
-
-## Quick test
+In a new terminal window:
 
 ```powershell
-curl.exe -F "file=@notes.txt" -F "project_id=default" http://localhost:8000/documents
-curl.exe http://localhost:8000/documents
+# Navigate to frontend directory
+cd frontend
 
-'{"message":"Summarize my notes","thread_id":"t1"}' | Set-Content body.json
-curl.exe -N -X POST http://localhost:8000/chat -H "Content-Type: application/json" --data "@body.json"
+# Install dependencies (if not already installed)
+npm install
+
+# Start Vite development server
+npm run dev
 ```
 
-## Known limits
+> The web application will launch at **`http://localhost:3000`** (or `http://localhost:5173`).
 
-- **Free model:** rate limits apply, and tool calling and structured output can be unreliable. Failures are caught and logged.
-- **Memory:** conversation memory lives in process (`InMemorySaver`) and resets when the server restarts. Documents and projects persist.
-- **Privacy:** free model endpoints may log prompts. Don't upload sensitive documents.
-- **Security (before deploying):** there is no auth, and `/documents/url` fetches any URL it is given, so block private IP ranges. Web pages are untrusted text that can try to steer the model, so don't add tools that act on the outside world.
-- **Search:** free scraping backends are unreliable from some networks. Set `TAVILY_API_KEY` for dependable results.
-- **PDFs:** text PDFs only. Scans need OCR.
-- **Schema changes:** `create_all` never alters existing tables. In development, delete `backend/data/app.db` after changing columns.
+---
 
-## Roadmap
+## 📡 API Reference Summary
 
-1. Prompt Library finished and tested
-2. Conversation history (threads) for the sidebar
-3. Model selector endpoint
-4. PDF export of project findings
-5. Frontend
-6. Persistent memory (SQLite or Postgres checkpointer)
-7. Auth and deployment
+### Chat Stream
+- **`POST /chat`**: Streams Server-Sent Events (SSE).
+  ```json
+  {
+    "message": "Explain React hooks in simple words",
+    "thread_id": "optional-uuid",
+    "project_id": "default",
+    "model": "nvidia/nemotron-3.5-super-vl:free",
+    "allow_web": true
+  }
+  ```
+  **Events emitted**:
+  - `event: thread` -> `{"thread_id": "..."}`
+  - `event: step` -> `{"tool": "search_docs", "args": {"query": "..."}}`
+  - `event: token` -> `"text chunk"`
+  - `event: limit_exceeded` -> `{"provider": "OpenRouter", "reason": "daily_free_limit", "alternative": "gemini-3.8-flash"}`
+  - `event: done` -> `{"seconds": 1.4, "steps": 2, "usage": {"total_tokens": 320}}`
+  - `event: error` -> `"Error description"`
 
-## Development notes
+### Documents & Knowledge Base
+- **`POST /documents`**: Upload file (`multipart/form-data` with `file`, `project_id`).
+- **`POST /documents/url`**: Index a web article `{"url": "...", "project_id": "..."}`.
+- **`GET /documents?project_id={pid}`**: List documents with chunk counts and index status (`indexed`, `indexing`, `failed`).
+- **`DELETE /documents/{id}`**: Delete document file and Chroma embeddings.
 
-- Call each tool directly once outside the agent when debugging. Retry middleware can hide a broken tool.
-- Watch only app code to avoid reload storms: `uvicorn app.main:app --reload --reload-dir app`.
-- Keep scratch scripts in `backend/tests/`, not `backend/`.
+### Research Hub & Projects
+- **`GET /projects`**: List all research workspaces.
+- **`POST /projects`**: Create new project workspace.
+- **`GET /projects/{pid}/stats`**: Source count, indexed count, and total chunk numbers.
+- **`POST /projects/{pid}/synthesis`**: Trigger structured multi-document synthesis.
+- **`POST /projects/{pid}/export`**: Download styled PDF research brief with citations.
+
+### Prompt Library
+- **`GET /prompts?q=&category=&pinned=`**: Search and filter prompts.
+- **`POST /prompts`**: Create a custom prompt.
+- **`POST /prompts/{id}/pin`**: Toggle favorite star pin.
+- **`DELETE /prompts/{id}`**: Remove custom prompt.
+
+---
+
+## 🔒 Security & Privacy
+- **Isolated Projects**: Documents are strictly partitioned by `project_id` in both SQLite and Chroma metadata filters.
+- **Private Conversations**: Session history remains on your local machine (`checkpoints.db`).
+- **Web Sandboxing**: Web browsing can be toggled on/off directly from the input bar.
+
+---
+
+## 📄 License
+MIT License. Built with ❤️ for productive AI exploration.
