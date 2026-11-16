@@ -36,11 +36,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ChatMind API", lifespan=lifespan)
 
+is_wildcard = "*" in settings.origins
+
 app.add_middleware(
   CORSMiddleware, 
-  allow_origins = settings.origins,
-  allow_methods = ["*"],
-  allow_headers = ["*"]
+  allow_origins=["*"] if is_wildcard else settings.origins,
+  allow_credentials=not is_wildcard,
+  allow_methods=["*"],
+  allow_headers=["*"]
 )
 
 app.include_router(chat.router)

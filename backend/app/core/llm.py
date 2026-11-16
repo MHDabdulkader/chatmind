@@ -21,8 +21,10 @@ def get_model(slug: str | None = None):
     )
 
   # Default to OpenRouter
+  openrouter_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
   return ChatOpenRouter(
     model=slug,
+    api_key=openrouter_key,
     max_tokens=2048,
     temperature=0.3,
     max_retries=1

@@ -10,7 +10,7 @@ import FilesView from './components/FilesView';
 import SettingsView from './components/SettingsView';
 import NewPromptModal from './components/NewPromptModal';
 import NewProjectModal from './components/NewProjectModal';
-import { getProjects, getModels } from './api';
+import { getProjects, getModels, checkHealth, wakeUpBackend } from './api';
 
 export default function App() {
   // Theme state
@@ -46,6 +46,10 @@ export default function App() {
   // Modals
   const [isNewPromptOpen, setIsNewPromptOpen] = useState(false);
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
+
+  // Render sleep & cold-start wake-up indicator
+  const [isWakingUp, setIsWakingUp] = useState(false);
+  const [wakeElapsed, setWakeElapsed] = useState(0);
 
   // Handle Dark mode class toggle
   useEffect(() => {
@@ -85,7 +89,20 @@ export default function App() {
   };
 
   useEffect(() => {
-    loadInitialData();
+    // Quick initial health probe to detect if Render backend is sleeping
+    checkHealth(3000).then(async (status) => {
+      if (status) {
+        loadInitialData();
+      } else {
+        // Backend sleeping on Render free tier (15-min idle spin-down)
+        setIsWakingUp(true);
+        const awake = await wakeUpBackend(60, (secs) => setWakeElapsed(secs));
+        setIsWakingUp(false);
+        if (awake) {
+          loadInitialData();
+        }
+      }
+    });
   }, []);
 
   const handleToggleTheme = () => {
@@ -155,6 +172,24 @@ export default function App() {
 
       {/* Main View Area */}
       <main className="flex-1 flex flex-col h-full min-w-0 overflow-hidden relative">
+        {/* Render Cold-start Wakeup Notification */}
+        {isWakingUp && (
+          <div className="bg-[#E07A5F]/15 border-b border-[#E07A5F]/30 px-4 py-2 text-xs flex items-center justify-between text-[#B34B30] dark:text-[#F39C7D] transition-all z-30">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E07A5F] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#E07A5F]"></span>
+              </span>
+              <span className="font-medium">
+                Backend is waking up from idle sleep ({wakeElapsed}s)... Render Free Tier spins up on demand.
+              </span>
+            </div>
+            <span className="text-[10px] font-mono uppercase tracking-wider opacity-75 hidden sm:inline px-2 py-0.5 rounded bg-[#E07A5F]/10">
+              Render Free Auto-Wake
+            </span>
+          </div>
+        )}
+
         {/* Mobile Header */}
         <Navbar
           onOpenMobileMenu={() => setMobileMenuOpen(true)}

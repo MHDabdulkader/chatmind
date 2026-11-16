@@ -21,9 +21,9 @@ class Document(Base):
   name: Mapped[str] = mapped_column(String)
   kind: Mapped[str] = mapped_column(String)
 
-  size_bytes: Mapped[str] = mapped_column(Integer, default=0)
+  size_bytes: Mapped[int] = mapped_column(Integer, default=0)
   status: Mapped[str] = mapped_column(String, default="indexing")
-  chunks: Mapped[str] = mapped_column(Integer, default=0)
+  chunks: Mapped[int] = mapped_column(Integer, default=0)
   error: Mapped[str | None] = mapped_column(Text, nullable=True)
   created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
   
