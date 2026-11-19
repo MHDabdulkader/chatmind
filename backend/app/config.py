@@ -10,8 +10,10 @@ class Settings(BaseSettings):
   openrouter_api_key : str = ""
   google_api_key : str = ""
   tavily_api_key : str = ""
-  default_model : str = "nvidia/nemotron-3.5-super-vl:free"
+  default_model : str = "gemini-3.5-flash-lite"
   embedding_model : str = "BAAI/bge-small-en-v1.5"
+  reranker_model: str = "ms-marco-TinyBERT-L-2-v2"
+  rerank_enabled: bool = True
   database_url : str = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or "sqlite:///./data/app.db"
   chroma_dir: str = "./data/chroma_db"
   upload_dir: str = "./data/uploads"

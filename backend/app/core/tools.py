@@ -23,7 +23,7 @@ def search_docs(query:str, runtime: ToolRuntime[ChatContext]) -> str:
   if not results:
     return "No documents indexed"
   return "\n\n".join(
-    f"[{d.metadata.get("source", "?")}] {d.page_content}" for d, _ in results
+    f"[{d.metadata.get('source', '?')} | Rerank Score: {score:.4f}] {d.page_content}" for d, score in results
   )  
 
 

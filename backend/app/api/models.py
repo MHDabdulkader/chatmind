@@ -13,22 +13,23 @@ router = APIRouter(prefix="/models", tags=["models"])
 STATIC = [
     # Google Gemini Direct (Google AI Studio Key)
     {
-        "id": "gemini-3.5-flash",
-        "name": "Google: Gemini 3.5 Flash (Direct)",
-        "provider": "Google",
-        "context": 1048576,
-        "vision": True,
-        "free": True,
-        "badge": "⚡ Google Direct (High Free Quota)"
-    },
-    {
         "id": "gemini-3.5-flash-lite",
         "name": "Google: Gemini 3.5 Flash Lite (Direct)",
         "provider": "Google",
         "context": 1048576,
         "vision": True,
         "free": True,
-        "badge": "🚀 Ultra-Fast & High Limits"
+        "default": True,
+        "badge": "🚀 Ultra-Fast & High Limits (Recommended)"
+    },
+    {
+        "id": "gemini-3.5-flash",
+        "name": "Google: Gemini 3.5 Flash (Direct)",
+        "provider": "Google",
+        "context": 1048576,
+        "vision": True,
+        "free": True,
+        "badge": "⚡ Google Direct (20/day limit)"
     },
     {
         "id": "gemini-3.8-flash",
@@ -141,7 +142,7 @@ def list_models(live: bool = False):
   has_google = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"))
   has_openrouter = bool(os.getenv("OPENROUTER_API_KEY"))
 
-  default = "gemini-3.5-flash" if has_google else settings.default_model
+  default = "gemini-3.5-flash-lite" if has_google else settings.default_model
 
   return [
     {

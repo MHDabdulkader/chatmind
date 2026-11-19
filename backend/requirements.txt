@@ -28,3 +28,5 @@ reportlab
 python-dotenv
 pytest
 httpx
+langfuse
+flashrank

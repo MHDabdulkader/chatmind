@@ -93,6 +93,7 @@ export default function ChatView({
   const [activePastedModal, setActivePastedModal] = useState(null);
   const [imageAttachments, setImageAttachments] = useState([]);
   const [activeImageModal, setActiveImageModal] = useState(null);
+  const [attachedDocs, setAttachedDocs] = useState([]);
   const imageInputRef = useRef(null);
 
   // Rate limit / Quota banner state
@@ -233,22 +234,34 @@ export default function ChatView({
   // Send message
   const handleSend = async (customText = null, modelOverride = null) => {
     const textToSend = (customText !== null ? customText : inputMessage).trim();
-    if (!textToSend && pastedAttachments.length === 0 && imageAttachments.length === 0) return;
+    if (!textToSend && pastedAttachments.length === 0 && imageAttachments.length === 0 && attachedDocs.length === 0) return;
     if (isGenerating) return;
 
     lastPromptSentRef.current = textToSend;
     const modelToUse = modelOverride || selectedModel;
-    const currentImages = [...imageAttachments]
-    setImageAttachments([])
-    // Combine user prompt and pasted attachments for agent ingestion
+    const currentImages = [...imageAttachments];
+    setImageAttachments([]);
+    const currentDocs = [...attachedDocs];
+    setAttachedDocs([]);
+
+    // Combine user prompt, attached documents, and pasted attachments for agent ingestion
     let agentPrompt = textToSend;
     if (pastedAttachments.length > 0) {
       const attachmentsBlock = pastedAttachments
         .map((a, i) => `\n\n--- [Attached Content #${i + 1}: ${a.title}] ---\n${a.content}`)
         .join('\n');
-      agentPrompt = textToSend
-        ? `${textToSend}\n${attachmentsBlock}`
+      agentPrompt = agentPrompt
+        ? `${agentPrompt}\n${attachmentsBlock}`
         : `Please inspect the attached content:\n${attachmentsBlock}`;
+    }
+
+    if (currentDocs.length > 0) {
+      const docNames = currentDocs.map(d => d.name).join(', ');
+      if (!agentPrompt) {
+        agentPrompt = `Please inspect the uploaded document (${docNames}), summarize its key findings, and explain what topics it covers.`;
+      } else {
+        agentPrompt = `${agentPrompt}\n\n[Referencing uploaded document: ${docNames}]`;
+      }
     }
 
     const currentAttachments = [...pastedAttachments];
@@ -260,9 +273,10 @@ export default function ChatView({
 
     const userMessage = {
       role: 'user',
-      content: textToSend ||(currentImages.length > 0? "Sent image" : 'Sent attached content'),
+      content: textToSend || (currentDocs.length > 0 ? `Uploaded document: ${currentDocs.map(d => d.name).join(', ')}` : (currentImages.length > 0 ? "Sent image" : 'Sent attached content')),
       pastedAttachments: currentAttachments,
       images: currentImages,
+      attachedDocs: currentDocs,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
@@ -430,11 +444,25 @@ export default function ChatView({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.type.startsWith("image/")) {
+      handleImageUpload(e);
+      return;
+    }
+
     setUploadingFile(true);
-    setUploadStatus(`Uploading ${file.name}...`);
+    setUploadStatus(`Indexing ${file.name}...`);
     try {
       await uploadDocument(file, activeProject?.id || 'default');
-      setUploadStatus(`Saved ${file.name} to knowledge vault!`);
+      setAttachedDocs(prev => [
+        ...prev,
+        {
+          id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name: file.name,
+          sizeKb: (file.size / 1024).toFixed(1),
+          type: file.name.split('.').pop().toLowerCase()
+        }
+      ]);
+      setUploadStatus(`Saved & indexed ${file.name}!`);
       setTimeout(() => setUploadStatus(null), 3500);
     } catch (err) {
       setUploadStatus(`Upload failed: ${err.message}`);
@@ -532,6 +560,8 @@ export default function ChatView({
                 setMessages([]);
                 setCurrentThread(null);
                 setPastedAttachments([]);
+                setImageAttachments([]);
+                setAttachedDocs([]);
               }}
               className="p-1.5 rounded-lg text-[#8C7E74] hover:text-red-500 hover:bg-[#F2ECE1] dark:hover:bg-[#28211B] transition-colors cursor-pointer"
               title="Clear chat"
@@ -660,6 +690,30 @@ export default function ChatView({
                           </div>
                         )}
 
+                        {/* Attached documents (PDFs, txt, md) in user message */}
+                        {msg.attachedDocs && msg.attachedDocs.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            {msg.attachedDocs.map((doc, dIdx) => (
+                              <div
+                                key={dIdx}
+                                className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-[#1E1915] border border-[#E0D5C7] dark:border-[#3A3027] text-xs shadow-2xs"
+                              >
+                                <div className="w-7 h-7 rounded-lg bg-[#FAF5EE] dark:bg-[#2B231D] text-[#E07A5F] flex items-center justify-center shrink-0">
+                                  <FileText className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="truncate">
+                                  <span className="font-semibold text-xs text-[#2D2621] dark:text-[#FAF7F2] block truncate">
+                                    {doc.name}
+                                  </span>
+                                  <span className="text-[10px] text-[#8A7D73]">
+                                    {doc.sizeKb} KB · Attached Document
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         {msg.timestamp && (
                           <div className="text-[10px] text-[#9A8D83] dark:text-[#7A6F66] text-right mt-1">
                             {msg.timestamp}
@@ -696,19 +750,28 @@ export default function ChatView({
 
                             {expandedThoughts[index] && (
                               <div className="p-3 border-t border-[#EAE1D4] dark:border-[#362D25] space-y-2 bg-white/60 dark:bg-[#1B1512]/60 font-mono text-[11px] text-[#6A5E54] dark:text-[#B0A499]">
-                                {msg.steps.map((st, sIdx) => (
-                                  <div key={sIdx} className="flex items-start gap-2">
-                                    <span className="text-[#E07A5F] font-bold">›</span>
-                                    <div>
-                                      <span className="font-semibold text-[#2D2621] dark:text-[#FAF7F2]">{st.tool || st}</span>
-                                      {st.args && (
-                                        <span className="text-[#8A7D73] ml-1.5">
-                                          ({JSON.stringify(st.args)})
-                                        </span>
-                                      )}
+                                {msg.steps.map((st, sIdx) => {
+                                  const toolName = st.tool || st;
+                                  const isDocs = toolName === 'search_docs';
+                                  return (
+                                    <div key={sIdx} className="flex items-start gap-2">
+                                      <span className="text-[#E07A5F] font-bold">›</span>
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="font-semibold text-[#2D2621] dark:text-[#FAF7F2]">{toolName}</span>
+                                        {isDocs && (
+                                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-400 text-[10px] font-semibold border border-amber-500/25">
+                                            ⚡ FlashRank Reranker (Top-4)
+                                          </span>
+                                        )}
+                                        {st.args && (
+                                          <span className="text-[#8A7D73]">
+                                            ({JSON.stringify(st.args)})
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -720,13 +783,17 @@ export default function ChatView({
                             <ReactMarkdown
                               remarkPlugins={[remarkGfm]}
                               components={{
-                                code({ node, inline, className, children, ...props }) {
+                                pre({ children }) {
+                                  return <>{children}</>;
+                                },
+                                code({ node, className, children, ...props }) {
                                   const match = /language-(\w+)/.exec(className || '');
                                   const codeContent = String(children).replace(/\n$/, '');
+                                  const isInline = !match && !codeContent.includes('\n');
 
-                                  if (inline) {
+                                  if (isInline) {
                                     return (
-                                      <code className="px-1.5 py-0.5 rounded-md bg-[#F2ECE1] dark:bg-[#2F2721] text-[#E07A5F] dark:text-[#F4A261] font-mono text-[13px]" {...props}>
+                                      <code className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[#F2ECE1] dark:bg-[#2F2721] text-[#E07A5F] dark:text-[#F4A261] font-mono text-[12px] font-semibold border border-[#E5DACD] dark:border-[#3E342B] inline-block" {...props}>
                                         {children}
                                       </code>
                                     );
@@ -740,9 +807,19 @@ export default function ChatView({
                                     />
                                   );
                                 },
-                                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                                ul: ({ children }) => <ul className="list-disc pl-5 space-y-1 my-2">{children}</ul>,
-                                ol: ({ children }) => <ol className="list-decimal pl-5 space-y-1 my-2">{children}</ol>,
+                                p: ({ children }) => <p className="mb-2.5 last:mb-0 leading-relaxed">{children}</p>,
+                                ul: ({ children }) => <ul className="list-disc pl-5 space-y-1.5 my-2.5">{children}</ul>,
+                                ol: ({ children }) => <ol className="list-decimal pl-5 space-y-1.5 my-2.5">{children}</ol>,
+                                table: ({ children }) => (
+                                  <div className="overflow-x-auto my-3 rounded-xl border border-[#E8DECD] dark:border-[#382F27]">
+                                    <table className="w-full text-left text-xs border-collapse">{children}</table>
+                                  </div>
+                                ),
+                                thead: ({ children }) => <thead className="bg-[#FAF5EE] dark:bg-[#251E19] border-b border-[#E8DECD] dark:border-[#382F27] font-semibold text-[#2D2621] dark:text-[#FAF7F2]">{children}</thead>,
+                                tbody: ({ children }) => <tbody className="divide-y divide-[#EFE7DC] dark:divide-[#2F2620]">{children}</tbody>,
+                                tr: ({ children }) => <tr className="hover:bg-[#FAF6F0] dark:hover:bg-[#261F1A] transition-colors">{children}</tr>,
+                                th: ({ children }) => <th className="px-3.5 py-2.5 font-semibold text-xs text-[#2D2621] dark:text-[#FAF7F2]">{children}</th>,
+                                td: ({ children }) => <td className="px-3.5 py-2 text-[#4A3E36] dark:text-[#C5B8AC]">{children}</td>,
                                 a: ({ href, children }) => (
                                   <a href={href} target="_blank" rel="noreferrer" className="text-[#E07A5F] hover:underline font-medium">
                                     {children}
@@ -989,9 +1066,40 @@ export default function ChatView({
                   </div>
                 ))}
               </div>
-            )
+            )}
 
-            }
+            {/* Attached PDF / Documents Pill Cards */}
+            {attachedDocs.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 px-1 pt-1 pb-2 border-b border-[#F2ECE1] dark:border-[#2C241E]">
+                {attachedDocs.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#FAF5EE] dark:bg-[#2B231D] border border-[#E9DFCF] dark:border-[#3A3027] hover:border-[#E07A5F] text-xs transition-colors group shadow-2xs"
+                  >
+                    <div className="w-6 h-6 rounded-lg bg-[#E07A5F]/15 text-[#E07A5F] flex items-center justify-center shrink-0">
+                      <FileText className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-xs text-[#2D2621] dark:text-[#FAF7F2] max-w-[200px] truncate group-hover:text-[#E07A5F]">
+                        {doc.name}
+                      </span>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        {doc.sizeKb} KB · Ready in context
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAttachedDocs(prev => prev.filter(d => d.id !== doc.id))}
+                      className="p-1 text-[#9A8D83] hover:text-red-500 rounded-md transition-colors cursor-pointer"
+                      title="Remove attachment"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Input Textarea with onPaste Interceptor */}
             <textarea
@@ -1001,7 +1109,13 @@ export default function ChatView({
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               rows={1}
-              placeholder={pastedAttachments.length > 0 ? "Add your instruction for this content..." : "Ask anything... (paste large text/code to attach)"}
+              placeholder={
+                attachedDocs.length > 0
+                  ? `Ask anything about ${attachedDocs.map(d => d.name).join(', ')}... (or press Enter to summarize)`
+                  : pastedAttachments.length > 0
+                  ? "Add your instruction for this content..."
+                  : "Ask anything... (attach PDF/docs, images, or paste text)"
+              }
               className="w-full bg-transparent px-3 py-1.5 text-sm text-[#2D2621] dark:text-[#FAF7F2] placeholder-[#9A8D83] focus:outline-none resize-none max-h-44 leading-relaxed"
             />
 
@@ -1022,14 +1136,14 @@ export default function ChatView({
                   disabled={uploadingFile}
                   type="button"
                   className="p-1.5 rounded-lg text-[#8A7D73] hover:text-[#2D2621] dark:hover:text-[#FAF7F2] hover:bg-[#F3ECE2] dark:hover:bg-[#2B231D] transition-colors cursor-pointer"
-                  title="Attach file (code, image, or PDF)"
+                  title="Attach file (PDF, code, or document)"
                 >
                   <Paperclip className="w-4 h-4" />
                 </button>
                 <input 
                   type='file'
                   ref={imageInputRef}
-                  onChange={handleFileUpload}
+                  onChange={handleImageUpload}
                   accept='image/png,image/jpeg,image/webp,image/gif'
                   multiple
                   className='hidden'
@@ -1040,6 +1154,7 @@ export default function ChatView({
                   className='p-1.5 rounded-lg text-[#8a7d73] hover:text-[#2d2621] dark:hover:text-[#faf7f2]
                     hover:bg-[#f3ece2] dark:hover:bg-[#2d2621] transition-colors cursor-pointer
                   '
+                  title="Attach images"
                  >
                   <ImageIcon className='w-4 h-4' />
                   </button> 
@@ -1109,9 +1224,9 @@ export default function ChatView({
                 ) : (
                   <button
                     onClick={() => handleSend()}
-                    disabled={!inputMessage.trim() && pastedAttachments.length === 0 && imageAttachments.length === 0}
+                    disabled={!inputMessage.trim() && pastedAttachments.length === 0 && imageAttachments.length === 0 && attachedDocs.length === 0}
                     className={`w-8 h-8 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer ${
-                      (inputMessage.trim() || pastedAttachments.length > 0 || imageAttachments.length > 0)
+                      (inputMessage.trim() || pastedAttachments.length > 0 || imageAttachments.length > 0 || attachedDocs.length > 0)
                         ? 'bg-[#E07A5F] hover:bg-[#D56B50] shadow-xs active:scale-95'
                         : 'bg-[#D9CFC4] dark:bg-[#3D342C] cursor-not-allowed opacity-70'
                     }`}

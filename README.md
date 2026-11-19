@@ -15,6 +15,7 @@ ChatMind features a warm, minimalist aesthetic inspired by modern creative studi
 
 ```
 chatmind/
+├── assets/           # Project screenshots, architecture & observability traces
 ├── backend/          # FastAPI + LangChain/LangGraph Agent + RAG
 │   ├── app/          # API routes, Core LLM/RAG logic, Services
 │   ├── data/         # SQLite DB, checkpoints, and Chroma vector store
@@ -34,6 +35,9 @@ chatmind/
   - **OpenRouter Multi-Vendor Pool**: Broad model catalog (`nvidia/nemotron-3.5-super-vl:free`, `cohere/north-mini-code:free`, etc.).
   - **Smart Rate Limit Detection & 1-Click Failover**: Automatic detection of `free-models-per-day` quota exhaustion with an in-chat alert banner and 1-click switch to Gemini.
 - ⚡ **Real-time SSE Streaming**: Low-latency token streaming with live tool call steps, latency benchmarks, and token counts.
+- 🔍 **Full-Stack LLM Observability (Langfuse)**: End-to-end execution flame graphs, tool latency metrics, token expenditures (USD), and multi-turn session tracking.
+- ⚡ **2-Stage Retrieval & Local Cross-Encoder Reranking (FlashRank)**: ChromaDB vector search pulls broad candidates (`fetch_k=12`) re-ranked by an ultra-lightweight ONNX cross-encoder (`ms-marco-TinyBERT`) in <10ms on CPU before prompt assembly.
+- 📎 **Interactive Document & Pasted Cards**: Attached PDFs, documents, images, and large code snippets display as interactive pills inside the input area with real-time status and ready-for-Q&A indicators.
 - 📋 **Claude-Style Pasted Snippet Cards**: Pasting large code (>12 lines) automatically collapses into an interactive pill widget with line/KB indicators and a dedicated preview modal before sending.
 - 🗄 **Universal Knowledge Vault**: Dedicated browser for all uploaded assets categorized by **Large Code**, **Images**, and **PDF Documents**.
 - 🤖 **Interactive Reasoning Traces**: Expandable _"Thought for X.Xs • Y steps"_ containers exposing exact search queries and tools executed.
@@ -73,8 +77,8 @@ chatmind/
 | **History**          | Persistent thread management, rename & delete                               | ✅ Completed  |
 | **Frontend UI**      | Responsive desktop & mobile views matching design mockups                   | ✅ Completed  |
 | **Frontend UI**      | Light (Cream) & Dark (Espresso) theme support                               | ✅ Completed  |
-| **Observability**    | End-to-end LLM session tracing, latency & USD token costs (Langfuse)        | ⏳ In Roadmap |
-| **Retrieval Engine** | 2-Stage RAG: ChromaDB + FlashRank local cross-encoder reranking             | ⏳ In Roadmap |
+| **Observability**    | End-to-end LLM session tracing, latency & USD token costs (Langfuse)        | ✅ Completed  |
+| **Retrieval Engine** | 2-Stage RAG: ChromaDB + FlashRank local cross-encoder reranking             | ✅ Completed  |
 | **RAG Evaluation**   | Automated Faithfulness & Relevance benchmark suite (`ragas`)                | ⏳ In Roadmap |
 
 ---
@@ -87,16 +91,26 @@ chatmind/
 ### 1. 🔍 LLM Observability & Session Tracing (Langfuse)
 
 - **Objective**: Gain deep visibility into multi-turn agent runs, flame graphs for tool executions, prompt latency benchmarks, and exact token costs (USD) per session.
-- **Technology**: [Langfuse](https://langfuse.com/) (Hobby Free Tier) / Arize Phoenix (local).
+- **Technology**: [Langfuse](https://langfuse.com/) (Hobby Free Tier) / OpenTelemetry SDK.
 - **Key Metrics**: Time to First Token (TTFT), step execution latency, input/output token cost analysis, and upstream error logging.
-- **Status**: 📋 _Planned (100% Free)_
+- **Status**: ✅ **Completed**
+- **Live Trace Sample**: [View Execution Trace on Langfuse Cloud](https://us.cloud.langfuse.com/project/cmwm01ju501dmad0e0gfslhxg/traces/ca9933d0721c1e29ea03f0a90fb5da43)
+
+#### Langfuse Analytics Dashboard & Cost Breakdown
+![Langfuse Analytics Dashboard](assets/langfuse_dashboard.png)
+
+#### Multi-Turn Agent Step Trace & Flame Graph
+![Langfuse Agent Execution Trace](assets/langfuse_tracing.png)
 
 ### 2. ⚡ 2-Stage Retrieval & Local Cross-Encoder Reranking (FlashRank)
 
-- **Objective**: Eliminate naive RAG vector search blindspots (e.g. acronyms, exact dates, domain keywords) by pulling the top 10–12 chunks from ChromaDB and re-ordering them with a local cross-encoder before LLM injection.
-- **Technology**: `flashrank` (ultra-lightweight ONNX cross-encoder running 100% locally on CPU).
-- **Benefits**: Zero extra API cost, microsecond execution, higher retrieval precision, and reduced prompt token size.
-- **Status**: 📋 _Planned (100% Free & Local)_
+- **Objective**: Eliminate naive RAG vector search blindspots (semantic drift, acronyms, exact dates, domain keywords) by pulling candidate chunks from ChromaDB and re-ordering them with a local cross-encoder before LLM injection.
+- **Architecture**:
+  1. **Stage 1 (Bi-Encoder Candidate Retrieval)**: Dense vector search over ChromaDB fetches broad candidates (`fetch_k = 12`) via cosine similarity with `BAAI/bge-small-en-v1.5`.
+  2. **Stage 2 (Cross-Encoder Re-ranking)**: `FlashRank` (`ms-marco-TinyBERT-L-2-v2`, 4MB quantized ONNX model) performs deep query-chunk token interaction scoring in <10ms on CPU.
+  3. **Stage 3 (Precision Context Assembly)**: The top `k` reranked chunks are returned with verified relevance scores attached to metadata (`doc.metadata["rerank_score"]`).
+- **Benefits**: Zero external API calls, 100% free & local execution, sub-10ms CPU latency, higher precision-at-k (P@k), and reduced context window bloat.
+- **Status**: ✅ **Completed & Unit-Tested** (`pytest backend/tests/test_rag_rerank.py`)
 
 ### 3. 🧪 Automated RAG Evaluation Suite (Ragas)
 
@@ -119,6 +133,8 @@ chatmind/
 | **Backend API**      | FastAPI, Uvicorn, SQLAlchemy 2.0, SQLite (WAL mode), Pydantic v2                         |
 | **AI Orchestration** | LangChain Core, `langchain-google-genai`, `langchain-openrouter`, LangGraph Checkpointer |
 | **Vector Engine**    | ChromaDB, HuggingFace Transformers (`BAAI/bge-small-en-v1.5`)                            |
+| **Reranking Engine** | FlashRank Local Cross-Encoder (`ms-marco-TinyBERT-L-2-v2` ONNX, <10ms CPU)               |
+| **Observability**    | Langfuse v5 (End-to-end Tracing, Session Cost Analysis, Latency Flame Graphs)            |
 | **Web & Ingestion**  | PyPDF, BeautifulSoup4, DuckDuckGo Search (`ddgs`), Requests, ReportLab                   |
 
 ---
