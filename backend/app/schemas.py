@@ -3,6 +3,7 @@ from datetime import datetime
 
 class ChatIn(BaseModel):
   message: str
+  images: list[str] = []
   thread_id: str | None = None
   model: str | None = None
   project_id: str | None = None

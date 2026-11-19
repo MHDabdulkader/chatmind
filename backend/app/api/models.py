@@ -7,6 +7,8 @@ from app.config import settings
 
 router = APIRouter(prefix="/models", tags=["models"])
 
+
+
 # Curated high-performance models across both Google Gemini and OpenRouter
 STATIC = [
     # Google Gemini Direct (Google AI Studio Key)
@@ -123,6 +125,8 @@ def list_models(live: bool = False):
   if live:
     live_models = _live_openrouter()
     if live_models:
+      # by_id = {m["id"]: m for m in live_models}
+      # models = [{**m, "vision": by_id[m["id"]]["vision"]} if m["id"] in by_id else m for m in models]
       badge_map = {m["id"]: m.get("badge") for m in STATIC}
       seen = {m["id"] for m in STATIC}
       for m in live_models:

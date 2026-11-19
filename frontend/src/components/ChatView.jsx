@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
+  ImageIcon,
   Sparkles,
   Send,
   Paperclip,
@@ -28,7 +29,8 @@ import {
   Eye,
   ExternalLink,
   AlertTriangle,
-  Zap
+  Zap,
+  Square
 } from 'lucide-react';
 import RobotMascot from './RobotMascot';
 import PastedContentModal from './PastedContentModal';
@@ -40,7 +42,7 @@ function parseUserContent(msg) {
   let attachments = msg.pastedAttachments ? [...msg.pastedAttachments] : [];
 
   if (text && typeof text === 'string' && text.includes('--- [Attached Content #')) {
-    const parts = text.split(/\r?\n\r?\n--- \[Attached Content #\d+: (.*?)\] ---\r?\n/);
+    const parts = text.split(/(?:^|\r?\n)+--- \[Attached Content #\d+:\s*(.*?)\] ---\r?\n/);
     if (parts.length > 1) {
       text = parts[0].trim();
       if (attachments.length === 0) {
@@ -89,6 +91,9 @@ export default function ChatView({
   // Claude-style pasted content attachments
   const [pastedAttachments, setPastedAttachments] = useState([]);
   const [activePastedModal, setActivePastedModal] = useState(null);
+  const [imageAttachments, setImageAttachments] = useState([]);
+  const [activeImageModal, setActiveImageModal] = useState(null);
+  const imageInputRef = useRef(null);
 
   // Rate limit / Quota banner state
   const [rateLimitNotice, setRateLimitNotice] = useState(null);
@@ -143,23 +148,51 @@ export default function ChatView({
 
   // Claude-style paste interceptor: large text or code becomes an attachment
   const handlePaste = (e) => {
-    const pasted = e.clipboardData?.getData('text');
-    if (!pasted) return;
+    const items = e.clipboardData?.items;
+    if(items){
+      for(const item of items){
+        if(item.type.startsWith("image/")){
+          e.preventDefault();
+          const file = item.getAsFile();
+          if(file){
+            const reader = new FileReader();
+            reader.onload = (event) =>{
+              setImageAttachments((prev) =>[
+                ...prev,
+                {
+                  id: `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+                  name : `Screenshot-${new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}.png`,
+                  url: event.target.result,
+                  sizeKb: (file.size/ 1024).toFixed(1)
+                }
+              ])
+            }
+            reader.readAsDataURL(file);
+            return ;
+          }
+        }
+      }
+    }
 
-    const lineCount = pasted.split('\n').length;
+
+    const pastedText = e.clipboardData?.getData('text');
+    // const lineCount = pastedText.split("\n").length;
+    if (!pastedText) return;
+
+    const lineCount = pastedText.split('\n').length;
     // Intercept if multi-line (> 3 lines) or long text (> 200 characters)
-    if (pasted.length > 200 || lineCount > 3) {
+    if (pastedText.length > 600 || lineCount > 12) {
       e.preventDefault();
-      const firstLine = pasted.trim().split('\n')[0].slice(0, 32);
+      const firstLine = pasted.trim().split('\n')[0].slice(0, 45);
       const title = firstLine.length > 4 ? `Snippet: ${firstLine}...` : 'Pasted text';
-      const sizeKb = (new Blob([pasted]).size / 1024).toFixed(1);
+      // const sizeKb = (new Blob([pasted]).size / 1024).toFixed(1);
 
       const newAttachment = {
-        id: Date.now() + Math.random(),
+        id: `att-${Date.now() + Math.random().toString(36).slice(2,6)}`,
         title,
-        content: pasted,
+        content: pastedText,
         lines: lineCount,
-        sizeKb
+        sizeKb: (pastedText.length / 1024).toFixed(1)
       };
 
       setPastedAttachments((prev) => [...prev, newAttachment]);
@@ -174,15 +207,39 @@ export default function ChatView({
     { icon: Sparkles, label: "Brainstorm ideas", prompt: "Brainstorm 5 innovative AI features for our document research workspace." }
   ];
 
+  const handleStop = ()=>{
+    if(abortControllerRef.current){
+      abortControllerRef.current.abort();
+    }
+    setIsGenerating(false)
+  }
+
+  const getActiveStepLabel = (steps) =>{
+    if(!steps || steps.length === 0) return "Thinking and generating response..."
+    const latest = steps[steps.length -1]
+    const tool = latest.tool || latest;
+    if(tool ==="web_search"){
+      const q = latest.args?.query ? `for "${latest.args.query}"`: "";
+      return `Searching the web${q}...`;
+    }
+    if(tool === "search_docs"){
+      const q = latest.args?.query ? `for "${latest.args?.query}"` : "";
+      return `Searching project knowledge${q}...`
+    }
+    return `Executing ${tool}...`
+  }
+
+
   // Send message
   const handleSend = async (customText = null, modelOverride = null) => {
     const textToSend = (customText !== null ? customText : inputMessage).trim();
-    if (!textToSend && pastedAttachments.length === 0) return;
+    if (!textToSend && pastedAttachments.length === 0 && imageAttachments.length === 0) return;
     if (isGenerating) return;
 
     lastPromptSentRef.current = textToSend;
     const modelToUse = modelOverride || selectedModel;
-
+    const currentImages = [...imageAttachments]
+    setImageAttachments([])
     // Combine user prompt and pasted attachments for agent ingestion
     let agentPrompt = textToSend;
     if (pastedAttachments.length > 0) {
@@ -203,8 +260,9 @@ export default function ChatView({
 
     const userMessage = {
       role: 'user',
-      content: textToSend || 'Sent attached content',
+      content: textToSend ||(currentImages.length > 0? "Sent image" : 'Sent attached content'),
       pastedAttachments: currentAttachments,
+      images: currentImages,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
@@ -234,6 +292,7 @@ export default function ChatView({
     try {
       await streamChat({
         message: agentPrompt,
+        images: currentImages.map((img) => img.url),
         threadId: threadIdReceived,
         model: modelToUse,
         projectId: activeProject?.id || 'default',
@@ -326,7 +385,19 @@ export default function ChatView({
               provider: 'OpenRouter',
               reason: 'daily_free_limit',
               message: 'OpenRouter daily free requests limit reached (free-models-per-day). Resets at 00:00 UTC.',
-              alternative: 'gemini-3.8-flash'
+              alternative: 'gemini-3.5-flash-lite'
+            });
+            setLastFailedPrompt(lastPromptSentRef.current);
+          } else if (
+            errStr.includes('503') ||
+            errStr.includes('UNAVAILABLE') ||
+            errStr.includes('high demand')
+          ) {
+            setRateLimitNotice({
+              provider: 'Google',
+              reason: 'upstream_high_demand',
+              message: 'Google Gemini 3.5 Flash is experiencing temporary high demand upstream. Switch to Gemini 3.5 Flash Lite for instant responses.',
+              alternative: 'gemini-3.5-flash-lite'
             });
             setLastFailedPrompt(lastPromptSentRef.current);
           }
@@ -373,6 +444,28 @@ export default function ChatView({
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
+  const handleImageUpload = (e) =>{
+    const files = Array.from(e.target.files || []);
+    for (const file of files){
+      if(file.type.startsWith("image/")){
+        const reader = new FileReader();
+        reader.onload = (event) =>{
+          setImageAttachments((prev) =>[
+            ...prev,
+            {
+              id: `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+              name: file.name,
+              url: event.target.result,
+              sizeKb: (file.size/1024).toFixed(1)
+            }
+          ])
+        }
+        reader.readAsDataURL(file)
+      }
+    }
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  }
 
   return (
     <div className="flex-1 flex flex-col h-screen bg-[#FAF7F2] dark:bg-[#141210] relative overflow-hidden transition-colors">
@@ -524,6 +617,20 @@ export default function ChatView({
                     {isUser ? (
                       <div className="self-end bg-[#F2ECE1] dark:bg-[#2B231D] text-[#2D2621] dark:text-[#FAF7F2] px-4 py-3 rounded-2xl rounded-tr-sm border border-[#E9E0D4] dark:border-[#382F28] text-sm leading-relaxed shadow-xs space-y-2.5">
                         {userText && <p className="whitespace-pre-wrap">{userText}</p>}
+                        {/* Attached image grid */}
+                        {msg.images && msg.images.length > 0 && (
+                          <div className='flex flex-wrap gap-2 pt-1'>
+                            {msg.images.map((img, iIdx) => (
+                              <img 
+                                key={iIdx}
+                                src={typeof img === "string" ? img : img?.url}
+                                alt='User attachment'
+                                onClick={()=>setActiveImageModal(typeof img === "string" ? img : img?.url)}
+                                className='w-28 h-28 lg:w-40 lg:h-40 object-cover rounded-xl border border-black/10 dark:border-white/10 cursor-pointer hover:scale-[1.02] transition-transform shadow-xs'
+                              />
+                            ))}
+                          </div>
+                        )}
 
                         {/* Claude-style attached cards in user message */}
                         {userAttachments.length > 0 && (
@@ -646,9 +753,23 @@ export default function ChatView({
                               {msg.content}
                             </ReactMarkdown>
                           ) : (
-                            <div className="flex items-center gap-2 text-[#8A7D73] text-xs py-1">
-                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                              <span>Generating response...</span>
+                            <div className="flex items-center justify-between gap-3 text-xs py-1">
+                              <div className="flex items-center gap-2 text-[#8A7D73] dark:text-[#A89D93] min-w-0">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                                <span className="font-medium truncate animate-pulse">
+                                  {getActiveStepLabel(msg.steps)}
+                                </span>
+                              </div>
+                              {isGenerating && (
+                                <button
+                                  onClick={handleStop}
+                                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[#F2ECE1] dark:bg-[#2B231D] hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/50 dark:hover:text-red-400 text-[#7A6E65] dark:text-[#A89D93] transition-colors cursor-pointer shrink-0"
+                                  title="Stop generation"
+                                >
+                                  <Square className="w-2.5 h-2.5 fill-current" />
+                                  <span>Stop</span>
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -844,6 +965,33 @@ export default function ChatView({
                 ))}
               </div>
             )}
+            {/* Image Attachments Thumbnail */}
+            {imageAttachments.length > 0 && (
+              <div
+                className='flex flex-wrap items-center gap-2 px-1 pt-1 pb-2 border-b border-[#E9DFCF] dark:border-[#3a3027]'
+              >
+                {imageAttachments.map((img) => (
+                  <div 
+                    key={img.id}
+                    className='relative group rounded-xl overflow-hidden border border-[#e9drcf] dark:border-[#3a3027] bg-stone-100 dark:bg-stone-900 shadow-2xs '
+                  >
+                    <img src={img.url}
+                      alt={img.name}
+                      onClick={()=> setActiveImageModal(img.url)}
+                      className='w-14 h-14 lg:w-45 lg:h-45 object-cover cursor-pointer hover:opacity-90 transition-opacity'
+                    />
+                    <button
+                      className='absolute top-1 right-1 p-0.5 rounded-full bg-black/70 text-white hover:bg-red-500 transition-colors'
+                      type='button'
+                      onClick={()=> setImageAttachments((prev) => prev.filter((a) => a.id != img.id))}
+                    ><X className='w-3 h-3 lg:w-5 lg:h-5'/></button>
+                    <span className='absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] lg:text-[16px] px-1 text-center truncate'>{img.sizeKb}KB</span>
+                  </div>
+                ))}
+              </div>
+            )
+
+            }
 
             {/* Input Textarea with onPaste Interceptor */}
             <textarea
@@ -878,7 +1026,23 @@ export default function ChatView({
                 >
                   <Paperclip className="w-4 h-4" />
                 </button>
-
+                <input 
+                  type='file'
+                  ref={imageInputRef}
+                  onChange={handleFileUpload}
+                  accept='image/png,image/jpeg,image/webp,image/gif'
+                  multiple
+                  className='hidden'
+                />
+                 <button 
+                  onClick={()=> imageInputRef.current?.click()}
+                  type='button'
+                  className='p-1.5 rounded-lg text-[#8a7d73] hover:text-[#2d2621] dark:hover:text-[#faf7f2]
+                    hover:bg-[#f3ece2] dark:hover:bg-[#2d2621] transition-colors cursor-pointer
+                  '
+                 >
+                  <ImageIcon className='w-4 h-4' />
+                  </button> 
                 {/* Web Search toggle */}
                 <button
                   type="button"
@@ -933,22 +1097,29 @@ export default function ChatView({
                   Ctrl + Enter
                 </span>
 
-                <button
-                  onClick={() => handleSend()}
-                  disabled={(!inputMessage.trim() && pastedAttachments.length === 0) || isGenerating}
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer ${
-                    (inputMessage.trim() || pastedAttachments.length > 0) && !isGenerating
-                      ? 'bg-[#E07A5F] hover:bg-[#D56B50] shadow-xs active:scale-95'
-                      : 'bg-[#D9CFC4] dark:bg-[#3D342C] cursor-not-allowed opacity-70'
-                  }`}
-                  aria-label="Send message"
-                >
-                  {isGenerating ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
+              {isGenerating ? (
+                  <button
+                    onClick={handleStop}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center bg-red-500 hover:bg-red-600 text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                    title="Stop generation"
+                    aria-label="Stop generation"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-white" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSend()}
+                    disabled={!inputMessage.trim() && pastedAttachments.length === 0 && imageAttachments.length === 0}
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer ${
+                      (inputMessage.trim() || pastedAttachments.length > 0 || imageAttachments.length > 0)
+                        ? 'bg-[#E07A5F] hover:bg-[#D56B50] shadow-xs active:scale-95'
+                        : 'bg-[#D9CFC4] dark:bg-[#3D342C] cursor-not-allowed opacity-70'
+                    }`}
+                    aria-label="Send message"
+                  >
                     <Send className="w-4 h-4" />
-                  )}
-                </button>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -968,6 +1139,27 @@ export default function ChatView({
         content={activePastedModal?.content}
         title={activePastedModal?.title || "Pasted Content"}
       />
+
+      {activeImageModal && (
+        <div
+          onClick={() => setActiveImageModal(null)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <img
+              src={activeImageModal}
+              alt="Enlarged view"
+              className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain"
+            />
+            <button
+              onClick={() => setActiveImageModal(null)}
+              className="absolute -top-3 -right-3 p-1.5 rounded-full bg-stone-800 text-white hover:bg-stone-700"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -23,7 +23,7 @@ def _parse_human_content(raw_text: str):
   if "--- [Attached Content #" not in raw_text:
     return raw_text, []
   
-  parts = re.split(r"\r?\n\r?\n--- \[Attached Content #\d+: (.*?)\] ---\r?\n", raw_text)
+  parts = re.split(r"(?:^|\r?\n)+--- \[Attached Content #\d+:\s*(.*?)\] ---\r?\n", raw_text)
   main_text = parts[0].strip()
   attachments = []
   for i in range(1, len(parts), 2):
@@ -61,7 +61,8 @@ def messages(tid:str, db: Session= Depends(get_db)):
       out.append({
         "role": "user",
         "content": main_text,
-        "pastedAttachments": atts
+        "pastedAttachments": atts,
+        "images": []
       })
       steps = []
     elif m.type == "ai":

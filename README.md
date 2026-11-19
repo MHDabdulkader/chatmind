@@ -58,11 +58,13 @@ chatmind/
 
 | Module | Feature | Status |
 | :--- | :--- | :--- |
-| **Model Providers** | Google Gemini Direct API (`gemini-3.8-flash`, `gemini-2.5-pro`) | ✅ Completed |
+| **Model Providers** | Google Gemini Direct API (`gemini-3.5-flash`, `gemini-3.5-flash-lite`) | ✅ Completed |
 | **Model Providers** | OpenRouter Multi-vendor API (`nemotron-3.5`, `north-mini-code`) | ✅ Completed |
 | **Model Providers** | Daily Quota Exceeded SSE event (`limit_exceeded`) & 1-click failover banner | ✅ Completed |
-| **Chat & Agent** | SSE streaming (`POST /chat`) & Tool step tracing | ✅ Completed |
+| **Chat & Agent** | SSE streaming (`POST /chat`) & Live tool process tracing | ✅ Completed |
+| **Chat & Agent** | Instant generation cancel / Stop button (`AbortController`) | ✅ Completed |
 | **Chat UI** | Claude-style pasted snippet collapsible cards & preview modal | ✅ Completed |
+| **Chat UI** | Multimodal Vision (clipboard image paste & upload preview) | ✅ Completed |
 | **Knowledge Base** | Document uploading & Knowledge Vault (Code, Images, PDFs) | ✅ Completed |
 | **Knowledge Base** | Local vector embeddings (`bge-small-en-v1.5`) & Chroma | ✅ Completed |
 | **Research Hub** | Workspace scoping, AI Key Findings synthesis & PDF export | ✅ Completed |
@@ -70,6 +72,38 @@ chatmind/
 | **History** | Persistent thread management, rename & delete | ✅ Completed |
 | **Frontend UI** | Responsive desktop & mobile views matching design mockups | ✅ Completed |
 | **Frontend UI** | Light (Cream) & Dark (Espresso) theme support | ✅ Completed |
+| **Observability** | End-to-end LLM session tracing, latency & USD token costs (Langfuse) | ⏳ In Roadmap |
+| **Retrieval Engine**| 2-Stage RAG: ChromaDB + FlashRank local cross-encoder reranking | ⏳ In Roadmap |
+| **RAG Evaluation** | Automated Faithfulness & Relevance benchmark suite (`ragas`) | ⏳ In Roadmap |
+
+---
+
+## 🗺️ Production AI Engineering Roadmap (Planned Additions)
+
+> [!NOTE]
+> **Developer Roadmap Note**: This section tracks planned enterprise-grade enhancements to transform ChatMind into an industry-standard, observable AI platform. *Remove or update this note once each feature is implemented and tested.*
+
+### 1. 🔍 LLM Observability & Session Tracing (Langfuse)
+* **Objective**: Gain deep visibility into multi-turn agent runs, flame graphs for tool executions, prompt latency benchmarks, and exact token costs (USD) per session.
+* **Technology**: [Langfuse](https://langfuse.com/) (Hobby Free Tier) / Arize Phoenix (local).
+* **Key Metrics**: Time to First Token (TTFT), step execution latency, input/output token cost analysis, and upstream error logging.
+* **Status**: 📋 *Planned (100% Free)*
+
+### 2. ⚡ 2-Stage Retrieval & Local Cross-Encoder Reranking (FlashRank)
+* **Objective**: Eliminate naive RAG vector search blindspots (e.g. acronyms, exact dates, domain keywords) by pulling the top 10–12 chunks from ChromaDB and re-ordering them with a local cross-encoder before LLM injection.
+* **Technology**: `flashrank` (ultra-lightweight ONNX cross-encoder running 100% locally on CPU).
+* **Benefits**: Zero extra API cost, microsecond execution, higher retrieval precision, and reduced prompt token size.
+* **Status**: 📋 *Planned (100% Free & Local)*
+
+### 3. 🧪 Automated RAG Evaluation Suite (Ragas)
+* **Objective**: Quantify and validate RAG accuracy using mathematical metrics to prevent hallucinations and measure pipeline improvements over time.
+* **Technology**: `ragas` with Google Gemini 3.5 Flash Lite acting as the judge evaluator.
+* **Key Metrics**:
+  - **Faithfulness**: Verifies answers are grounded strictly in retrieved documents (0.0 to 1.0).
+  - **Answer Relevance**: Measures how directly the response addresses the prompt.
+  - **Context Precision**: Confirms top-ranked chunks contain the ground-truth answers.
+* **Deliverable**: Automated test script generating a benchmark score table for repository documentation.
+* **Status**: 📋 *Planned (100% Free)*
 
 ---
 
@@ -119,14 +153,7 @@ GOOGLE_API_KEY=your_google_ai_studio_key_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 
 # App Defaults
-DEFAULT_MODEL=gemini-3.8-flash
-EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
-DATABASE_URL=sqlite:///./data/app.db
-CHROMA_DIR=./data/chroma_db
-UPLOAD_DIR=./data/uploads
-CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
-```
-DEFAULT_MODEL=nvidia/nemotron-3.5-super-vl:free
+DEFAULT_MODEL=gemini-3.5-flash
 EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
 DATABASE_URL=sqlite:///./data/app.db
 CHROMA_DIR=./data/chroma_db

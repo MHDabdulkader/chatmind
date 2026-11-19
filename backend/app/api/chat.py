@@ -44,9 +44,16 @@ def chat(body: ChatIn):
       touch_thread(thread_id, body.message, body.project_id)
       print(f"[CHAT] thread={thread_id[:8]} msg={body.message[:60]!r}")
 
+      if body.images:
+        user_content = [{"type": "text", "text": body.message or "Analyze this image:"}]
+        for img in body.images:
+          user_content.append({"type": "image_url", "image_url": {"url": img}})
+      else:
+        user_content = body.message
+
       limit_notified = False
       for mode, payload in agent.stream(
-        {"messages": [{"role": "user", "content": body.message}]},
+        {"messages": [{"role": "user", "content": user_content}]},
         config,
         context=ChatContext(project_id=body.project_id, allow_web=body.allow_web),
         stream_mode=["messages", "updates"]
@@ -101,34 +108,51 @@ def chat(body: ChatIn):
     except Exception as e:
       traceback.print_exc()
       err_text = str(e)
-      if "RESOURCE_EXHAUSTED" in err_text or "Quota exceeded" in err_text:
-        model_name = body.model or "gemini-3.8-flash"
+
+      # 1. Google 503 High Demand Spikes (temporary server load)
+      if "503" in err_text or "UNAVAILABLE" in err_text or "high demand" in err_text.lower():
+        yield sse("limit_exceeded", {
+          "provider": "Google",
+          "reason": "upstream_high_demand",
+          "message": "Google Gemini 3.5 Flash is currently experiencing a temporary high demand spike upstream. Switch to Gemini 3.5 Flash Lite for instant responses.",
+          "alternative": "gemini-3.5-flash-lite"
+        })
+        msg = "Google Gemini 3.5 Flash is currently experiencing high demand upstream. Click the banner below to switch to Gemini 3.5 Flash Lite."
+        yield sse("error", msg)
+
+      # 2. Google Daily Quota Limits
+      elif "RESOURCE_EXHAUSTED" in err_text or "Quota exceeded" in err_text:
+        model_name = body.model or "gemini-3.5-flash"
         yield sse("limit_exceeded", {
           "provider": "Google",
           "reason": "daily_free_limit",
-          "message": f"Daily quota limit exceeded for '{model_name}'. Switch to Gemini 3.5 Flash for high free limits.",
-          "alternative": "gemini-3.5-flash"
+          "message": f"Daily quota limit exceeded for '{model_name}'. Switch to Gemini 3.5 Flash Lite for high limits.",
+          "alternative": "gemini-3.5-flash-lite"
         })
-        msg = f"Quota exceeded for {model_name}. Please switch to Google Gemini 3.5 Flash to continue chatting."
+        msg = f"Quota exceeded for {model_name}. Please switch to Google Gemini 3.5 Flash Lite to continue chatting."
         yield sse("error", msg)
+
+      # 3. OpenRouter Free Tier Limit
       elif "free-models-per-day" in err_text:
         yield sse("limit_exceeded", {
           "provider": "OpenRouter",
           "reason": "daily_free_limit",
           "message": "OpenRouter daily free requests limit reached (free-models-per-day). Resets at 00:00 UTC.",
-          "alternative": "gemini-3.5-flash"
+          "alternative": "gemini-3.5-flash-lite"
         })
-        msg = "Daily Free Quota Exceeded on OpenRouter (free-models-per-day). Your Google Gemini key is active—click the banner below to switch to Gemini 3.5 Flash and continue chatting instantly!"
+        msg = "Daily Free Quota Exceeded on OpenRouter (free-models-per-day). Your Google Gemini key is active—click the banner below to switch to Gemini 3.5 Flash Lite and continue chatting instantly!"
         yield sse("error", msg)
+
+      # 4. Upstream Rate Limiting
       elif "429" in err_text or "rate-limited" in err_text.lower() or "TooManyRequests" in type(e).__name__:
         model_name = body.model or settings.default_model
         yield sse("limit_exceeded", {
           "provider": "Google" if "gemini" in str(model_name).lower() else "OpenRouter",
           "reason": "upstream_rate_limited",
           "message": f"Model '{model_name}' is temporarily rate-limited upstream.",
-          "alternative": "gemini-3.5-flash"
+          "alternative": "gemini-3.5-flash-lite"
         })
-        msg = f"The model '{model_name}' is temporarily rate-limited upstream. Switch to Google Gemini 3.5 Flash to continue."
+        msg = f"The model '{model_name}' is temporarily rate-limited upstream. Switch to Google Gemini 3.5 Flash Lite to continue."
         yield sse("error", msg)
       else:
         yield sse("error", f"{type(e).__name__}: {e}")
