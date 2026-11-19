@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: chatmind-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: LANGSMITH_API_KEY
+        sync: false
+      - key: LANGSMITH_TRACING
+        value: "true"
+      - key: LANGSMITH_PROJECT
+        value: "chatmind"
+      - key: CORS_ORIGINS
+        value: "*"

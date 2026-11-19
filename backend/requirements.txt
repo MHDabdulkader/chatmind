@@ -4,11 +4,13 @@ uvicorn[standard]
 python-multipart
 pydantic-settings
 sqlalchemy
+psycopg2-binary
 
 # LangChain / LangGraph
 langchain
 langgraph
 langgraph-checkpoint-sqlite
+langchain-google-genai
 langchain-openrouter
 langchain-huggingface
 langchain-chroma

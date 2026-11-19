@@ -1,15 +1,28 @@
 // Base API client for ChatMind
 export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-export async function checkHealth() {
+export async function checkHealth(timeoutMs = 5000) {
   try {
     const res = await fetch(`${API_BASE}/health`, {
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     return res.ok ? await res.json() : null;
   } catch {
     return null;
   }
+}
+
+// Auto-wake Render free backend if sleeping (inactivity spin-down)
+export async function wakeUpBackend(maxWaitSeconds = 60, onTick = () => {}) {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitSeconds * 1000) {
+    const elapsed = Math.round((Date.now() - start) / 1000);
+    onTick(elapsed);
+    const health = await checkHealth(4000);
+    if (health) return true;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return false;
 }
 
 // Models

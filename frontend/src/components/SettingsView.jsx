@@ -32,7 +32,13 @@ export default function SettingsView({
   const [savedNotice, setSavedNotice] = useState(false);
 
   useEffect(() => {
-    checkHealth().then(status => setHealthStatus(status ? 'online' : 'offline'));
+    checkHealth(4000).then(status => {
+      if (status) {
+        setHealthStatus('online');
+      } else {
+        setHealthStatus('offline');
+      }
+    });
   }, []);
 
   const handleSave = () => {
@@ -68,12 +74,12 @@ export default function SettingsView({
               {healthStatus === 'online' ? (
                 <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  API Connected (Port 8000)
+                  API Online & Ready
                 </span>
               ) : healthStatus === 'offline' ? (
-                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400">
-                  <AlertCircle className="w-3.5 h-3.5 text-red-500" />
-                  API Disconnected
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                  Idle or Sleeping
                 </span>
               ) : (
                 <span className="text-stone-400 text-xs">Checking API...</span>
@@ -84,7 +90,7 @@ export default function SettingsView({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
             <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#191512] border border-[#EFE8DE] dark:border-[#2B231D]">
               <span className="text-[#8A7D73] text-[11px] block">Database</span>
-              <span className="font-semibold text-[#2D2621] dark:text-[#FAF7F2] mt-0.5 block">SQLite WAL</span>
+              <span className="font-semibold text-[#2D2621] dark:text-[#FAF7F2] mt-0.5 block">PostgreSQL / SQLite</span>
             </div>
             <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#191512] border border-[#EFE8DE] dark:border-[#2B231D]">
               <span className="text-[#8A7D73] text-[11px] block">Vector Store</span>
